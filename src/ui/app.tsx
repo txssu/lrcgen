@@ -12,6 +12,8 @@ import { ExportScreen } from "./screens/export-screen";
 import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
 import { ImportScreen } from "./screens/import-screen";
 import { PreviewScreen } from "./screens/preview-screen";
+import { detectMatchingAudio } from "../core/auto-detect-audio";
+import { LocalAudioSource } from "../adapters/audio-source/local-audio-source";
 
 type Screen =
   | { name: "start" }
@@ -143,10 +145,18 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
       return (
         <ImportScreen
           lrcParser={registry.lrcParser}
-          onImport={(doc) => {
+          onImport={async (doc, filePath) => {
             setDocument(doc);
+            const audioPath = await detectMatchingAudio(filePath);
+            if (audioPath) {
+              const source = registry.audioSources[0] as LocalAudioSource;
+              const ref = source.selectFromPath(audioPath);
+              setAudioRef(ref);
+              await initPlayer(ref);
+            }
             setScreen({ name: "setup" });
           }}
+          onCancel={() => setScreen({ name: "start" })}
         />
       );
 

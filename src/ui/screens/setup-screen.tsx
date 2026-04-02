@@ -7,6 +7,7 @@ import type { LrcDocument } from "../../core/lrc-document";
 import { linesFromText, addLines, setMetadata } from "../../core/lrc-document";
 import { LocalAudioSource } from "../../adapters/audio-source/local-audio-source";
 import { KeyHints } from "../components/key-hints";
+import { FilePicker } from "../components/file-picker";
 
 interface SetupScreenProps {
   registry: Registry;
@@ -95,15 +96,16 @@ export function SetupScreen({
 
   if (mode === "audio-path") {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Enter audio file path:</Text>
-        <TextInput value={inputValue} onChange={setInputValue} onSubmit={(value) => {
+      <FilePicker
+        extensions={[".mp3", ".flac", ".wav", ".ogg", ".m4a", ".aac", ".wma"]}
+        onSelect={(filePath) => {
           const source = registry.audioSources[0] as LocalAudioSource;
-          const ref = source.selectFromPath(value);
+          const ref = source.selectFromPath(filePath);
           onAudioRefChange(ref);
           setMode("menu");
-        }} />
-      </Box>
+        }}
+        onCancel={() => setMode("menu")}
+      />
     );
   }
 
@@ -133,21 +135,21 @@ export function SetupScreen({
 
   if (mode === "lyrics-file") {
     return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Enter lyrics file path (.txt):</Text>
-        <TextInput value={inputValue} onChange={setInputValue} onSubmit={async (value) => {
+      <FilePicker
+        extensions={[".txt", ".lrc"]}
+        onSelect={async (filePath) => {
           try {
-            const resolved = value.replace(/^~/, Bun.env.HOME ?? "");
-            const text = await Bun.file(resolved).text();
+            const text = await Bun.file(filePath).text();
             if (text.trim()) {
               onDocumentChange(addLines(document, linesFromText(text)));
             }
           } catch {
-            // stay in menu, user can try again
+            // ignore read errors
           }
           setMode("menu");
-        }} />
-      </Box>
+        }}
+        onCancel={() => setMode("menu")}
+      />
     );
   }
 
