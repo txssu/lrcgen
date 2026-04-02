@@ -61,6 +61,15 @@ describe("EditScreen", () => {
     expect(frame).toContain("▸");
   });
 
+  test("p key triggers onPreview callback", () => {
+    let previewCalled = false;
+    const { stdin } = render(
+      <EditScreen document={makeDoc()} player={noopPlayer} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} onPreview={() => { previewCalled = true; }} />
+    );
+    stdin.write("p");
+    expect(previewCalled).toBe(true);
+  });
+
   test("play line calls playSegment with correct from/to timestamps", () => {
     const { player, calls } = createTrackingPlayer();
     const { stdin } = render(

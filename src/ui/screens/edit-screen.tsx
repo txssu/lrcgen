@@ -15,13 +15,14 @@ interface EditScreenProps {
   onDocumentChange: (doc: LrcDocument) => void;
   onResync: () => void;
   onExport: () => void;
+  onPreview?: () => void;
 }
 
 type Mode = "navigate" | "edit-text" | "set-time";
 
 const STEP_OPTIONS = [10, 50, 100, 200, 500, 1000];
 
-export function EditScreen({ document, player, onDocumentChange, onResync, onExport }: EditScreenProps) {
+export function EditScreen({ document, player, onDocumentChange, onResync, onExport, onPreview }: EditScreenProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<Mode>("navigate");
   const [inputValue, setInputValue] = useState("");
@@ -64,6 +65,8 @@ export function EditScreen({ document, player, onDocumentChange, onResync, onExp
       setStepIndex((i) => Math.max(0, i - 1));
     } else if (input === "]") {
       setStepIndex((i) => Math.min(STEP_OPTIONS.length - 1, i + 1));
+    } else if (input === "p") {
+      onPreview?.();
     } else if (input === "r") {
       onResync();
     } else if (input === "q") {
@@ -111,6 +114,7 @@ export function EditScreen({ document, player, onDocumentChange, onResync, onExp
         { key: "e", label: "edit" },
         { key: "t", label: "set time" },
         { key: "[]", label: "step size" },
+        { key: "p", label: "preview" },
         { key: "r", label: "re-sync" },
         { key: "q", label: "done" },
       ]} />

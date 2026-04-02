@@ -11,6 +11,7 @@ import { EditScreen } from "./screens/edit-screen";
 import { ExportScreen } from "./screens/export-screen";
 import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
 import { ImportScreen } from "./screens/import-screen";
+import { PreviewScreen } from "./screens/preview-screen";
 
 type Screen =
   | { name: "start" }
@@ -18,6 +19,7 @@ type Screen =
   | { name: "setup" }
   | { name: "play-sync" }
   | { name: "edit" }
+  | { name: "preview" }
   | { name: "export" };
 
 interface AppProps {
@@ -105,6 +107,20 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
           onDocumentChange={setDocument}
           onResync={() => setScreen({ name: "play-sync" })}
           onExport={() => setScreen({ name: "export" })}
+          onPreview={() => setScreen({ name: "preview" })}
+        />
+      );
+
+    case "preview":
+      if (!player) {
+        setScreen({ name: "setup" });
+        return null;
+      }
+      return (
+        <PreviewScreen
+          document={document}
+          player={player}
+          onBack={() => setScreen({ name: "edit" })}
         />
       );
 
