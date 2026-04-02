@@ -54,20 +54,19 @@ export class FfplayAudioPlayer implements AudioPlayer {
   }
 
   pause(): void {
-    if (!this._playing || !this.process) return;
+    if (!this._playing) return;
     this._position = this.getCurrentPosition();
-    this.process.kill("SIGSTOP");
-    this._playing = false;
     this.stopTicker();
+    if (this.process) {
+      this.process.kill();
+      this.process = null;
+    }
+    this._playing = false;
   }
 
   resume(): void {
-    if (this._playing || !this.process) return;
-    this.process.kill("SIGCONT");
-    this._playing = true;
-    this.offsetMs = this._position;
-    this.startedAt = Date.now();
-    this.startTicker();
+    if (this._playing) return;
+    this.play(this._position);
   }
 
   seek(ms: number): void {

@@ -47,4 +47,30 @@ describe("FfplayAudioPlayer", () => {
 
     player.dispose();
   });
+
+  test("pause kills the ffplay process (not just SIGSTOP)", async () => {
+    const player = new FfplayAudioPlayer(TEST_FILE);
+    await player.init();
+
+    player.play();
+    await new Promise((r) => setTimeout(r, 200));
+
+    player.pause();
+
+    // After pause, the process should be fully terminated (killed, not frozen)
+    // Access internal state to verify
+    expect((player as any).process).toBeNull();
+
+    // Position should be frozen
+    const posAtPause = player.getCurrentPosition();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(player.getCurrentPosition()).toBe(posAtPause);
+
+    // Resume should restart playback from saved position
+    player.resume();
+    await new Promise((r) => setTimeout(r, 150));
+    expect(player.getCurrentPosition()).toBeGreaterThan(posAtPause);
+
+    player.dispose();
+  });
 });
