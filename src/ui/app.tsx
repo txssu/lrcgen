@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Text } from "ink";
 import type { Registry } from "../registry";
 import type { LrcDocument } from "../core/lrc-document";
 import type { AudioRef } from "../ports/audio-source";
@@ -80,7 +79,8 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
 
     case "play-sync":
       if (!player) {
-        return <Text color="red">No audio player available</Text>;
+        setScreen({ name: "setup" });
+        return null;
       }
       return (
         <PlaySyncScreen
@@ -95,7 +95,8 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
 
     case "edit":
       if (!player) {
-        return <Text color="red">No audio player available</Text>;
+        setScreen({ name: "setup" });
+        return null;
       }
       return (
         <EditScreen
@@ -128,7 +129,7 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
           lrcParser={registry.lrcParser}
           onImport={(doc) => {
             setDocument(doc);
-            setScreen({ name: "edit" });
+            setScreen({ name: "setup" });
           }}
         />
       );
