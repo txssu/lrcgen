@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Text } from "ink";
 import type { Registry } from "../registry";
 import type { LrcDocument } from "../core/lrc-document";
