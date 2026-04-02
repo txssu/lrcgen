@@ -4,6 +4,7 @@ import type { LrcDocument } from "../core/lrc-document";
 import type { AudioRef } from "../ports/audio-source";
 import { createDocument } from "../core/lrc-document";
 import { StartScreen } from "./screens/start-screen";
+import { SetupScreen } from "./screens/setup-screen";
 
 type Screen =
   | { name: "start" }
@@ -32,6 +33,18 @@ export function App({ registry }: AppProps) {
               setScreen({ name: "edit" });
             }
           }}
+        />
+      );
+    case "setup":
+      return (
+        <SetupScreen
+          registry={registry}
+          document={document}
+          audioRef={audioRef}
+          onDocumentChange={setDocument}
+          onAudioRefChange={setAudioRef}
+          onStartSync={() => setScreen({ name: "play-sync" })}
+          onQuit={() => process.exit(0)}
         />
       );
     default:
