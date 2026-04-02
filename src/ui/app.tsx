@@ -11,6 +11,7 @@ import { PlaySyncScreen } from "./screens/play-sync-screen";
 import { EditScreen } from "./screens/edit-screen";
 import { ExportScreen } from "./screens/export-screen";
 import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
+import { ImportScreen } from "./screens/import-screen";
 
 type Screen =
   | { name: "start" }
@@ -122,7 +123,15 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
     }
 
     case "import":
-      return null; // Will be implemented in Task 18
+      return (
+        <ImportScreen
+          lrcParser={registry.lrcParser}
+          onImport={(doc) => {
+            setDocument(doc);
+            setScreen({ name: "edit" });
+          }}
+        />
+      );
 
     default:
       return null;
