@@ -1,20 +1,16 @@
 # lrcgen
 
-A terminal app for making LRC files — the kind that sync lyrics to music.
-
-You bring the audio and the lyrics, tap spacebar in time with the song, and lrcgen writes the timestamps for you. Then fine-tune whatever needs fixing and export.
+TUI for making LRC files. Play a song, tap spacebar on each line, get timestamps. Fix what's off, export.
 
 ## What it does
 
-- Load any audio file your system's ffmpeg can handle
-- Paste in lyrics and sync them line-by-line in real time
-- Adjust timestamps after the fact — shift by milliseconds or type exact values
-- Import existing LRC files to edit them
-- Export clean Simple LRC
+Plays audio through ffplay (so anything ffmpeg handles works). You paste in lyrics and sync them while the song runs. Timestamps land where you hit spacebar. After that you can nudge them with arrow keys or type exact values. Also reads existing `.lrc` files if you need to edit one.
+
+Exports Simple LRC format.
 
 ## Install
 
-You need [Bun](https://bun.sh) and [ffmpeg](https://ffmpeg.org/download.html) (for `ffplay`).
+Needs [Bun](https://bun.sh) and [ffmpeg](https://ffmpeg.org/download.html) (`ffplay` specifically).
 
 ```bash
 git clone https://github.com/txssu/lrcgen.git
@@ -28,39 +24,39 @@ bun install
 bun run start
 ```
 
-### Workflow
-
 1. Pick "Create new LRC" or "Import existing LRC"
-2. Point it at an audio file and paste your lyrics
-3. Hit spacebar to mark each line as the song plays
-4. Switch to the editor to fix anything that's off — arrow keys nudge timestamps, or type them in directly
+2. Point it at an audio file, paste your lyrics
+3. Spacebar marks each line as the song plays
+4. Arrow keys and manual input to fix timestamps
 5. Export to `.lrc`
 
-### Keyboard shortcuts
+### Keys
 
-**Sync mode:**
-| Key | Action |
-|-----|--------|
+Sync mode:
+
+| Key | What it does |
+|-----|-------------|
 | Space | Mark current line |
 | Enter | Skip line |
 | Backspace | Undo last mark |
-| q | Finish |
+| q | Done, go to editor |
 
-**Edit mode:**
-| Key | Action |
-|-----|--------|
-| Up/Down | Navigate lines |
+Edit mode:
+
+| Key | What it does |
+|-----|-------------|
+| Up/Down | Move between lines |
 | Left/Right | Shift timestamp ±step |
-| `[` / `]` | Change step size |
+| `[` / `]` | Change step size (10ms to 1s) |
 | Enter | Play current line |
 | e | Edit line text |
-| t | Type exact timestamp |
-| r | Re-sync from scratch |
+| t | Type a timestamp manually |
+| r | Back to sync mode |
 | q | Export |
 
 ## Architecture
 
-Plugin-based. Audio sources, lyrics providers, and the LRC parser are all swappable through a port/adapter pattern. The default setup uses ffplay for audio and supports local files, but the system is built so you could plug in Spotify, Genius lyrics, or whatever else without touching the core.
+Port/adapter pattern. Audio sources, lyrics providers, and the LRC parser are interfaces. Swap in Spotify playback or Genius lyrics without changing the rest. Ships with ffplay for audio and clipboard paste for lyrics.
 
 ## License
 
