@@ -33,6 +33,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
     this._playing = true;
     this.startedAt = Date.now();
     this.startTicker();
+    this.watchProcessExit();
   }
 
   playSegment(fromMs: number, toMs: number): void {
@@ -49,6 +50,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
     this._playing = true;
     this.startedAt = Date.now();
     this.startTicker();
+    this.watchProcessExit();
   }
 
   pause(): void {
@@ -102,5 +104,18 @@ export class FfplayAudioPlayer implements AudioPlayer {
 
   private stopTicker(): void {
     if (this.ticker) { clearInterval(this.ticker); this.ticker = null; }
+  }
+
+  private watchProcessExit(): void {
+    const proc = this.process;
+    if (!proc) return;
+    proc.exited.then(() => {
+      // Only act if this is still the active process (not replaced by a new play/seek)
+      if (this.process === proc) {
+        this._position = this.getCurrentPosition();
+        this._playing = false;
+        this.stopTicker();
+      }
+    });
   }
 }
