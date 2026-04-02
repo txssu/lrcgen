@@ -98,4 +98,21 @@ describe("FfplayAudioPlayer", () => {
 
     player.dispose();
   });
+
+  test("playSegment clamps position to segment end when process exits", async () => {
+    const player = new FfplayAudioPlayer(TEST_FILE);
+    await player.init();
+
+    // Play segment from 100ms to 300ms (200ms duration)
+    player.playSegment(100, 300);
+
+    // Wait for ffplay to finish (startup + 200ms + some buffer)
+    await new Promise((r) => setTimeout(r, 1500));
+
+    // Position should be clamped to 300 (the segment end), not ~100+wallclock
+    const pos = player.getCurrentPosition();
+    expect(pos).toBe(300);
+
+    player.dispose();
+  });
 });

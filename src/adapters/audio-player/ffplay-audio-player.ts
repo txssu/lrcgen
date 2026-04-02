@@ -12,6 +12,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
   private startedAt: number = 0;
   private offsetMs: number = 0;
   private _lastTickPosition: number = 0;
+  private _segmentEndMs: number | null = null;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -25,6 +26,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
   play(fromMs?: number): void {
     this.dispose();
     this.offsetMs = fromMs ?? 0;
+    this._segmentEndMs = null;
     const args = ["-nodisp", "-autoexit", "-loglevel", "quiet"];
     if (this.offsetMs > 0) {
       args.push("-ss", String(this.offsetMs / 1000));
@@ -40,6 +42,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
   playSegment(fromMs: number, toMs: number): void {
     this.dispose();
     this.offsetMs = fromMs;
+    this._segmentEndMs = toMs;
     const durationSec = (toMs - fromMs) / 1000;
     const args = ["-nodisp", "-autoexit", "-loglevel", "quiet"];
     if (this.offsetMs > 0) {
@@ -76,7 +79,11 @@ export class FfplayAudioPlayer implements AudioPlayer {
 
   getCurrentPosition(): number {
     if (!this._playing) return this._position;
-    return this.offsetMs + (Date.now() - this.startedAt);
+    const raw = this.offsetMs + (Date.now() - this.startedAt);
+    if (this._segmentEndMs !== null) {
+      return Math.min(raw, this._segmentEndMs);
+    }
+    return raw;
   }
 
   getDuration(): number {
@@ -113,7 +120,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
     proc.exited.then(() => {
       // Only act if this is still the active process (not replaced by a new play/seek)
       if (this.process === proc) {
-        this._position = this._lastTickPosition;
+        this._position = this._segmentEndMs ?? this._lastTickPosition;
         this._playing = false;
         this.stopTicker();
       }
