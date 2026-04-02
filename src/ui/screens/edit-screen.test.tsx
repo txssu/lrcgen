@@ -14,6 +14,7 @@ function makeDoc() {
 
 const noopPlayer = {
   play: () => {},
+  playSegment: () => {},
   pause: () => {},
   resume: () => {},
   seek: () => {},
@@ -22,6 +23,24 @@ const noopPlayer = {
   onPosition: () => () => {},
   dispose: () => {},
 };
+
+function createTrackingPlayer() {
+  const calls: string[] = [];
+  return {
+    player: {
+      play: (fromMs?: number) => { calls.push(`play:${fromMs ?? 0}`); },
+      pause: () => { calls.push("pause"); },
+      resume: () => { calls.push("resume"); },
+      seek: (ms: number) => { calls.push(`seek:${ms}`); },
+      getCurrentPosition: () => 0,
+      getDuration: () => 60000,
+      onPosition: () => () => {},
+      dispose: () => { calls.push("dispose"); },
+      playSegment: (fromMs: number, toMs: number) => { calls.push(`playSegment:${fromMs}-${toMs}`); },
+    },
+    calls,
+  };
+}
 
 describe("EditScreen", () => {
   test("renders synced lines with timestamps", () => {
@@ -40,5 +59,15 @@ describe("EditScreen", () => {
     );
     const frame = lastFrame()!;
     expect(frame).toContain("▸");
+  });
+
+  test("play line calls playSegment with correct from/to timestamps", () => {
+    const { player, calls } = createTrackingPlayer();
+    const { stdin } = render(
+      <EditScreen document={makeDoc()} player={player} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} />
+    );
+    // Press Enter to play current line (Line A: 1000ms -> Line B: 5000ms)
+    stdin.write("\r");
+    expect(calls).toContain("playSegment:1000-5000");
   });
 });

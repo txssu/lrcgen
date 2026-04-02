@@ -34,16 +34,16 @@ export function PlaySyncScreen({ document, player, onComplete }: PlaySyncScreenP
     if (input === " ") {
       engine.mark(player.getCurrentPosition());
       syncState();
-      if (engine.isComplete) { player.pause(); onComplete(engine.document); }
+      if (engine.isComplete) { player.dispose(); onComplete(engine.document); }
     } else if (key.return) {
       engine.skip();
       syncState();
-      if (engine.isComplete) { player.pause(); onComplete(engine.document); }
+      if (engine.isComplete) { player.dispose(); onComplete(engine.document); }
     } else if (key.backspace || key.delete) {
       engine.undo();
       syncState();
     } else if (input === "q") {
-      player.pause();
+      player.dispose();
       onComplete(engine.document);
     }
   });

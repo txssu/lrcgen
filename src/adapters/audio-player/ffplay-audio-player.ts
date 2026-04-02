@@ -35,6 +35,22 @@ export class FfplayAudioPlayer implements AudioPlayer {
     this.startTicker();
   }
 
+  playSegment(fromMs: number, toMs: number): void {
+    this.dispose();
+    this.offsetMs = fromMs;
+    const durationSec = (toMs - fromMs) / 1000;
+    const args = ["-nodisp", "-autoexit", "-loglevel", "quiet"];
+    if (this.offsetMs > 0) {
+      args.push("-ss", String(this.offsetMs / 1000));
+    }
+    args.push("-t", String(durationSec));
+    args.push(this.filePath);
+    this.process = Bun.spawn(["ffplay", ...args], { stdout: "ignore", stderr: "ignore" });
+    this._playing = true;
+    this.startedAt = Date.now();
+    this.startTicker();
+  }
+
   pause(): void {
     if (!this._playing || !this.process) return;
     this._position = this.getCurrentPosition();

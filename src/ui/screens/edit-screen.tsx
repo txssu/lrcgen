@@ -52,8 +52,7 @@ export function EditScreen({ document, player, onDocumentChange, onResync, onExp
       if (currentLine?.timestamp !== null && currentLine?.timestamp !== undefined) {
         const nextLine = document.lines[currentIndex + 1];
         const endMs = nextLine?.timestamp ?? (currentLine.timestamp! + 5000);
-        player.play(currentLine.timestamp!);
-        setTimeout(() => player.pause(), endMs - currentLine.timestamp!);
+        player.playSegment(currentLine.timestamp!, endMs);
       }
     } else if (input === "e") {
       setInputValue(currentLine?.text ?? "");
