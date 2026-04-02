@@ -73,4 +73,29 @@ describe("FfplayAudioPlayer", () => {
 
     player.dispose();
   });
+
+  test("pause saves the last-reported position, not a recalculated one", async () => {
+    const player = new FfplayAudioPlayer(TEST_FILE);
+    await player.init();
+
+    // Collect positions reported by the ticker
+    const reported: number[] = [];
+    player.onPosition((ms) => reported.push(ms));
+
+    player.play();
+    // Wait for several ticks
+    await new Promise((r) => setTimeout(r, 300));
+
+    // The last reported position before pause
+    const lastReported = reported[reported.length - 1]!;
+
+    // Pause — position should match what the UI was showing (last tick), not Date.now()
+    player.pause();
+    const savedPos = player.getCurrentPosition();
+
+    // savedPos should equal lastReported, not be ahead of it
+    expect(savedPos).toBe(lastReported);
+
+    player.dispose();
+  });
 });

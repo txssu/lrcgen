@@ -11,6 +11,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
   private ticker: ReturnType<typeof setInterval> | null = null;
   private startedAt: number = 0;
   private offsetMs: number = 0;
+  private _lastTickPosition: number = 0;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -55,7 +56,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
 
   pause(): void {
     if (!this._playing) return;
-    this._position = this.getCurrentPosition();
+    this._position = this._lastTickPosition;
     this.stopTicker();
     if (this.process) {
       this.process.kill();
@@ -97,6 +98,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
     this.stopTicker();
     this.ticker = setInterval(() => {
       const pos = this.getCurrentPosition();
+      this._lastTickPosition = pos;
       for (const cb of this.positionCallbacks) { cb(pos); }
     }, 50);
   }
@@ -111,7 +113,7 @@ export class FfplayAudioPlayer implements AudioPlayer {
     proc.exited.then(() => {
       // Only act if this is still the active process (not replaced by a new play/seek)
       if (this.process === proc) {
-        this._position = this.getCurrentPosition();
+        this._position = this._lastTickPosition;
         this._playing = false;
         this.stopTicker();
       }
