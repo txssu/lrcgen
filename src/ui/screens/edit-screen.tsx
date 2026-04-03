@@ -268,7 +268,13 @@ export function EditorScreen({
       } else {
         selected.provider!.fetch({ artist: document.metadata.artist, title: document.metadata.title }).then((text) => {
           if (text.trim()) {
-            onDocumentChange(addLines(document, linesFromText(text)));
+            // If text looks like LRC (has timestamps), parse it
+            if (text.match(/^\[(\d{2,}:\d{2}\.\d{2})\]/m)) {
+              const parsed = registry.lrcParser.parse(text);
+              onDocumentChange({ ...document, lines: parsed.lines });
+            } else {
+              onDocumentChange(addLines(document, linesFromText(text)));
+            }
           }
           setMode("edit");
         });
