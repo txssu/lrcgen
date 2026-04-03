@@ -2,6 +2,8 @@ import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { FfplayAudioPlayer } from "./ffplay-audio-player";
 import { unlinkSync } from "node:fs";
 
+const hasFfmpeg = await Bun.spawn(["which", "ffmpeg"], { stdout: "ignore", stderr: "ignore" }).exited.then((c) => c === 0).catch(() => false);
+
 const TEST_FILE = "/tmp/lrcgen-test-silence.wav";
 
 beforeAll(async () => {
@@ -17,7 +19,7 @@ afterAll(() => {
   try { unlinkSync(TEST_FILE); } catch {}
 });
 
-describe("FfplayAudioPlayer", () => {
+describe.skipIf(!hasFfmpeg)("FfplayAudioPlayer", () => {
   test("playSegment stops position tracking after segment ends", async () => {
     const player = new FfplayAudioPlayer(TEST_FILE);
     await player.init();

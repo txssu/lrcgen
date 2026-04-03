@@ -1,7 +1,9 @@
 import { test, expect, describe } from "bun:test";
 import { ClipboardLyricsProvider } from "./clipboard-lyrics-provider";
 
-describe("ClipboardLyricsProvider", () => {
+const hasPbcopy = await Bun.spawn(["which", "pbcopy"], { stdout: "ignore", stderr: "ignore" }).exited.then((c) => c === 0).catch(() => false);
+
+describe.skipIf(!hasPbcopy)("ClipboardLyricsProvider", () => {
   test("reads multi-line text from system clipboard", async () => {
     // Put known text into clipboard
     const testText = "Line one\nLine two\nLine three";
