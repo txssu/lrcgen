@@ -1,8 +1,10 @@
-import React from "react";
 import { test, expect, describe } from "bun:test";
 import { render } from "ink-testing-library";
-import { EditScreen } from "./edit-screen";
+import { EditorScreen } from "./edit-screen";
 import { createDocument, addLines, linesFromText, setTimestamp } from "../../core/lrc-document";
+import { createDefaultRegistry } from "../../registry";
+
+const tick = () => new Promise((r) => setTimeout(r, 50));
 
 function makeDoc() {
   let doc = addLines(createDocument(), linesFromText("Line A\nLine B\nLine C"));
@@ -24,59 +26,171 @@ const noopPlayer = {
   dispose: () => {},
 };
 
-function createTrackingPlayer() {
-  const calls: string[] = [];
-  return {
-    player: {
-      play: (fromMs?: number) => { calls.push(`play:${fromMs ?? 0}`); },
-      pause: () => { calls.push("pause"); },
-      resume: () => { calls.push("resume"); },
-      seek: (ms: number) => { calls.push(`seek:${ms}`); },
-      getCurrentPosition: () => 0,
-      getDuration: () => 60000,
-      onPosition: () => () => {},
-      dispose: () => { calls.push("dispose"); },
-      playSegment: (fromMs: number, toMs: number) => { calls.push(`playSegment:${fromMs}-${toMs}`); },
-    },
-    calls,
-  };
-}
-
-describe("EditScreen", () => {
-  test("renders synced lines with timestamps", () => {
+describe("EditorScreen", () => {
+  test("renders key hints in edit mode", () => {
+    const registry = createDefaultRegistry();
     const { lastFrame } = render(
-      <EditScreen document={makeDoc()} player={noopPlayer} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} />
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={null}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
     );
     const frame = lastFrame()!;
+    expect(frame).toContain("audio");
+    expect(frame).toContain("lyrics");
+    expect(frame).toContain("save");
+  });
+
+  test("renders audio info when audioRef is set", () => {
+    const registry = createDefaultRegistry();
+    const ref = { source: "Local File", id: "/path/to/song.mp3", displayName: "song.mp3" };
+    const { lastFrame } = render(
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={ref}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("song.mp3");
     expect(frame).toContain("00:01.00");
+  });
+
+  test("renders lines from document", () => {
+    const registry = createDefaultRegistry();
+    const { lastFrame } = render(
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={null}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
+    );
+    const frame = lastFrame()!;
     expect(frame).toContain("Line A");
-    expect(frame).toContain("00:05.00");
     expect(frame).toContain("Line B");
   });
-  test("shows first line as current", () => {
+
+  test("shows mode indicator", () => {
+    const registry = createDefaultRegistry();
     const { lastFrame } = render(
-      <EditScreen document={makeDoc()} player={noopPlayer} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} />
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={null}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
     );
     const frame = lastFrame()!;
-    expect(frame).toContain("▸");
+    expect(frame).toContain("[edit]");
   });
 
-  test("p key triggers onPreview callback", () => {
-    let previewCalled = false;
-    const { stdin } = render(
-      <EditScreen document={makeDoc()} player={noopPlayer} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} onPreview={() => { previewCalled = true; }} />
+  test("y key enters sync mode when player available", async () => {
+    const registry = createDefaultRegistry();
+    const { lastFrame, stdin } = render(
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={{ source: "Local File", id: "/test.mp3", displayName: "test.mp3" }}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
+    );
+    stdin.write("y");
+    await tick();
+    const frame = lastFrame()!;
+    expect(frame).toContain("[sync]");
+  });
+
+  test("p key enters play mode when player available", async () => {
+    const registry = createDefaultRegistry();
+    const { lastFrame, stdin } = render(
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={{ source: "Local File", id: "/test.mp3", displayName: "test.mp3" }}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
     );
     stdin.write("p");
-    expect(previewCalled).toBe(true);
+    await tick();
+    const frame = lastFrame()!;
+    expect(frame).toContain("[play]");
   });
 
-  test("play line calls playSegment with correct from/to timestamps", () => {
-    const { player, calls } = createTrackingPlayer();
+  test("q key calls onQuit", () => {
+    const registry = createDefaultRegistry();
+    let quit = false;
     const { stdin } = render(
-      <EditScreen document={makeDoc()} player={player} onDocumentChange={() => {}} onResync={() => {}} onExport={() => {}} />
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={null}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => { quit = true; }}
+      />
     );
-    // Press Enter to play current line (Line A: 1000ms -> Line B: 5000ms)
-    stdin.write("\r");
-    expect(calls).toContain("playSegment:1000-5000");
+    stdin.write("q");
+    expect(quit).toBe(true);
+  });
+
+  test("s key shows save prompt with default path", async () => {
+    const registry = createDefaultRegistry();
+    const ref = { source: "Local File", id: "/tmp/test-song.mp3", displayName: "test-song.mp3" };
+    const { lastFrame, stdin } = render(
+      <EditorScreen
+        registry={registry}
+        document={makeDoc()}
+        audioRef={ref}
+        player={noopPlayer}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
+    );
+    stdin.write("s");
+    await tick();
+    const frame = lastFrame()!;
+    expect(frame).toContain("test-song.lrc");
+  });
+
+  test("empty document shows no audio message", () => {
+    const registry = createDefaultRegistry();
+    const { lastFrame } = render(
+      <EditorScreen
+        registry={registry}
+        document={createDocument()}
+        audioRef={null}
+        player={null}
+        onDocumentChange={() => {}}
+        onAudioRefChange={async () => {}}
+        onQuit={() => {}}
+      />
+    );
+    const frame = lastFrame()!;
+    expect(frame).toContain("No audio selected");
+    expect(frame).toContain("[edit]");
   });
 });

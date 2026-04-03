@@ -5,24 +5,13 @@ import type { AudioRef } from "../ports/audio-source";
 import type { AudioPlayer } from "../ports/audio-player";
 import { createDocument } from "../core/lrc-document";
 import { StartScreen } from "./screens/start-screen";
-import { SetupScreen } from "./screens/setup-screen";
-import { PlaySyncScreen } from "./screens/play-sync-screen";
-import { EditScreen } from "./screens/edit-screen";
-import { ExportScreen } from "./screens/export-screen";
-import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
 import { ImportScreen } from "./screens/import-screen";
-import { PreviewScreen } from "./screens/preview-screen";
+import { EditorScreen } from "./screens/edit-screen";
+import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
 import { detectMatchingAudio } from "../core/auto-detect-audio";
 import { LocalAudioSource } from "../adapters/audio-source/local-audio-source";
 
-type Screen =
-  | { name: "start" }
-  | { name: "import" }
-  | { name: "setup" }
-  | { name: "play-sync" }
-  | { name: "edit" }
-  | { name: "preview" }
-  | { name: "export" };
+type Screen = { name: "start" } | { name: "import" } | { name: "editor" };
 
 interface AppProps {
   registry: Registry;
@@ -57,89 +46,13 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
         <StartScreen
           onSelect={(action) => {
             if (action === "create") {
-              setScreen({ name: "setup" });
+              setScreen({ name: "editor" });
             } else {
               setScreen({ name: "import" });
             }
           }}
         />
       );
-
-    case "setup":
-      return (
-        <SetupScreen
-          registry={registry}
-          document={document}
-          audioRef={audioRef}
-          onDocumentChange={setDocument}
-          onAudioRefChange={(ref) => {
-            setAudioRef(ref);
-            initPlayer(ref);
-          }}
-          onStartSync={() => setScreen({ name: "play-sync" })}
-          onQuit={() => process.exit(0)}
-        />
-      );
-
-    case "play-sync":
-      if (!player) {
-        setScreen({ name: "setup" });
-        return null;
-      }
-      return (
-        <PlaySyncScreen
-          document={document}
-          player={player}
-          onComplete={(doc) => {
-            setDocument(doc);
-            setScreen({ name: "edit" });
-          }}
-        />
-      );
-
-    case "edit":
-      if (!player) {
-        setScreen({ name: "setup" });
-        return null;
-      }
-      return (
-        <EditScreen
-          document={document}
-          player={player}
-          onDocumentChange={setDocument}
-          onResync={() => setScreen({ name: "play-sync" })}
-          onExport={() => setScreen({ name: "export" })}
-          onPreview={() => setScreen({ name: "preview" })}
-        />
-      );
-
-    case "preview":
-      if (!player) {
-        setScreen({ name: "setup" });
-        return null;
-      }
-      return (
-        <PreviewScreen
-          document={document}
-          player={player}
-          onBack={() => setScreen({ name: "edit" })}
-        />
-      );
-
-    case "export": {
-      const defaultPath = audioRef
-        ? audioRef.id.replace(/\.[^.]+$/, ".lrc")
-        : "output.lrc";
-      return (
-        <ExportScreen
-          document={document}
-          lrcParser={registry.lrcParser}
-          defaultPath={defaultPath}
-          onBack={() => setScreen({ name: "edit" })}
-          onSaved={() => {}}
-        />
-      );
-    }
 
     case "import":
       return (
@@ -154,9 +67,25 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
               setAudioRef(ref);
               await initPlayer(ref);
             }
-            setScreen({ name: "setup" });
+            setScreen({ name: "editor" });
           }}
           onCancel={() => setScreen({ name: "start" })}
+        />
+      );
+
+    case "editor":
+      return (
+        <EditorScreen
+          registry={registry}
+          document={document}
+          audioRef={audioRef}
+          player={player}
+          onDocumentChange={setDocument}
+          onAudioRefChange={async (ref) => {
+            setAudioRef(ref);
+            await initPlayer(ref);
+          }}
+          onQuit={() => process.exit(0)}
         />
       );
 
