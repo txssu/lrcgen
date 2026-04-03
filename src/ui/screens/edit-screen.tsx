@@ -13,6 +13,7 @@ import { LineList } from "../components/line-list";
 import { KeyHints } from "../components/key-hints";
 import { FilePicker } from "../components/file-picker";
 import { SyncEngine } from "../../core/sync-engine";
+import { msToLrc } from "../../core/time-utils";
 import path from "node:path";
 
 interface EditorScreenProps {
@@ -35,6 +36,7 @@ type Mode =
   | "text-input-time"
   | "text-input-metadata"
   | "text-input-save"
+  | "confirm-lrc"
   | "publish-select"
   | "publishing"
   | "lyrics-source";
@@ -66,6 +68,7 @@ export function EditorScreen({
   const [savePath, setSavePath] = useState("");
   const [publishIndex, setPublishIndex] = useState(0);
   const [publishStatus, setPublishStatus] = useState("");
+  const [foundLrcPath, setFoundLrcPath] = useState("");
 
   const step = STEP_OPTIONS[stepIndex]!;
   const currentLine = document.lines[currentIndex];
@@ -133,6 +136,16 @@ export function EditorScreen({
       handlePlayInput(input, key);
     } else if (mode === "lyrics-source") {
       handleLyricsSourceInput(input, key);
+    } else if (mode === "confirm-lrc") {
+      if (input === "y") {
+        Bun.file(foundLrcPath).text().then((text) => {
+          const parsed = registry.lrcParser.parse(text);
+          onDocumentChange({ ...document, lines: parsed.lines, metadata: { ...document.metadata, ...parsed.metadata, tool: document.metadata.tool } });
+          setMode("edit");
+        });
+      } else if (input === "n" || key.escape) {
+        setMode("edit");
+      }
     } else if (mode === "publish-select") {
       handlePublishSelectInput(input, key);
     }
@@ -329,7 +342,14 @@ export function EditorScreen({
           const source = registry.audioSources[0] as LocalAudioSource;
           const ref = source.selectFromPath(filePath);
           await onAudioRefChange(ref);
-          setMode("edit");
+          // Check for matching .lrc file
+          const lrcPath = filePath.replace(/\.[^.]+$/, ".lrc");
+          if (await Bun.file(lrcPath).exists()) {
+            setFoundLrcPath(lrcPath);
+            setMode("confirm-lrc");
+          } else {
+            setMode("edit");
+          }
         }}
         onCancel={() => setMode("edit")}
       />
@@ -344,7 +364,12 @@ export function EditorScreen({
           try {
             const text = await Bun.file(filePath).text();
             if (text.trim()) {
-              onDocumentChange(addLines(document, linesFromText(text)));
+              if (filePath.endsWith(".lrc") || text.match(/^\[(\d{2,}:\d{2}\.\d{2})\]/m)) {
+                const parsed = registry.lrcParser.parse(text);
+                onDocumentChange({ ...document, lines: parsed.lines, metadata: { ...document.metadata, ...parsed.metadata, tool: document.metadata.tool } });
+              } else {
+                onDocumentChange(addLines(document, linesFromText(text)));
+              }
             }
           } catch {}
           setMode("edit");
@@ -430,6 +455,15 @@ export function EditorScreen({
           ))}
         </Box>
         <KeyHints hints={[{ key: "↑↓", label: "navigate" }, { key: "⏎", label: "select" }, { key: "Esc", label: "back" }]} />
+      </Box>
+    );
+  }
+
+  if (mode === "confirm-lrc") {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text>Found matching LRC file: {path.basename(foundLrcPath)}</Text>
+        <Text>Load it? (y/n)</Text>
       </Box>
     );
   }
