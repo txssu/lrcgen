@@ -2,8 +2,7 @@ import type { LyricsPublisher, PublishResult } from "../../ports/lyrics-publishe
 import type { LrcDocument } from "../../core/lrc-document";
 import type { LrcParser } from "../../ports/lrc-parser";
 import { solveChallenge } from "./lrclib-pow";
-
-const BASE_URL = "https://lrclib.net/api";
+import { LRCLIB_BASE_URL, LRCLIB_USER_AGENT } from "../lrclib-common";
 
 interface PublishBody {
   trackName: string;
@@ -39,9 +38,9 @@ export class LrclibPublisher implements LyricsPublisher {
   async publish(doc: LrcDocument, audioLengthMs: number): Promise<PublishResult> {
     try {
       // Step 1: Request challenge
-      const challengeRes = await fetch(`${BASE_URL}/request-challenge`, {
+      const challengeRes = await fetch(`${LRCLIB_BASE_URL}/request-challenge`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "User-Agent": LRCLIB_USER_AGENT },
       });
       if (!challengeRes.ok) {
         return { success: false, error: `Challenge request failed: ${challengeRes.status}` };
@@ -54,10 +53,11 @@ export class LrclibPublisher implements LyricsPublisher {
 
       // Step 3: Publish
       const body = buildPublishBody(doc, audioLengthMs, this.parser);
-      const publishRes = await fetch(`${BASE_URL}/publish`, {
+      const publishRes = await fetch(`${LRCLIB_BASE_URL}/publish`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "User-Agent": LRCLIB_USER_AGENT,
           "X-Publish-Token": token,
         },
         body: JSON.stringify(body),

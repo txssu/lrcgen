@@ -1,6 +1,5 @@
 import type { LyricsProvider } from "../../ports/lyrics-provider";
-
-const BASE_URL = "https://lrclib.net/api";
+import { LRCLIB_BASE_URL, LRCLIB_USER_AGENT } from "../lrclib-common";
 
 interface LrclibResponse {
   syncedLyrics: string | null;
@@ -23,7 +22,9 @@ export class LrclibLyricsProvider implements LyricsProvider {
         track_name: query.title,
       });
 
-      const res = await globalThis.fetch(`${BASE_URL}/get?${params}`);
+      const res = await globalThis.fetch(`${LRCLIB_BASE_URL}/get?${params}`, {
+        headers: { "User-Agent": LRCLIB_USER_AGENT },
+      });
       if (!res.ok) return "";
 
       const data = (await res.json()) as LrclibResponse;
