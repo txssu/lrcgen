@@ -35,7 +35,7 @@ export class SimpleLrcParser implements LrcParser {
         continue;
       }
 
-      const lineMatch = trimmed.match(/^\[(\d{2,}:\d{2}\.\d{2})\](.*)$/);
+      const lineMatch = trimmed.match(/^\[(\d{2,}:\d{2}\.\d{2})\]\s?(.*)$/);
       if (lineMatch) {
         const timestamp = lrcToMs(lineMatch[1]!);
         lines.push({ timestamp, text: lineMatch[2]! });
@@ -60,7 +60,7 @@ export class SimpleLrcParser implements LrcParser {
     parts.push(`[tool:${doc.metadata.tool}]`);
     for (const line of doc.lines) {
       if (line.timestamp !== null) {
-        parts.push(`[${msToLrc(line.timestamp)}]${line.text}`);
+        parts.push(`[${msToLrc(line.timestamp)}] ${line.text}`);
       } else {
         parts.push(line.text);
       }

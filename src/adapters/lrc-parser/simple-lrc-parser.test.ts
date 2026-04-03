@@ -57,8 +57,8 @@ describe("SimpleLrcParser.serialize", () => {
     expect(output).toContain("[ar:Muse]");
     expect(output).toContain("[ti:Uprising]");
     expect(output).toContain("[tool:https://github.com/txssu/lrcgen]");
-    expect(output).toContain("[00:01.00]Hello");
-    expect(output).toContain("[00:05.00]World");
+    expect(output).toContain("[00:01.00] Hello");
+    expect(output).toContain("[00:05.00] World");
   });
   test("omits timestamp for unsynced lines", () => {
     const doc = parser.parse("Plain text line");
