@@ -20,7 +20,7 @@ export function createDefaultRegistry(): Registry {
   return {
     audioSources: [new LocalAudioSource()],
     lyricsProviders: [new ClipboardLyricsProvider(), new LrclibLyricsProvider()],
-    lyricsPublishers: [new LrclibPublisher(lrcParser)],
+    lyricsPublishers: [new LrclibPublisher()],
     lrcParser,
   };
 }

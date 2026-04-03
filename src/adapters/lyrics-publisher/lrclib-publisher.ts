@@ -1,6 +1,6 @@
 import type { LyricsPublisher, PublishResult } from "../../ports/lyrics-publisher";
 import type { LrcDocument } from "../../core/lrc-document";
-import type { LrcParser } from "../../ports/lrc-parser";
+import { msToLrc } from "../../core/time-utils";
 import { solveChallenge } from "./lrclib-pow";
 import { LRCLIB_BASE_URL, LRCLIB_USER_AGENT } from "../lrclib-common";
 
@@ -13,8 +13,11 @@ interface PublishBody {
   syncedLyrics: string;
 }
 
-export function buildPublishBody(doc: LrcDocument, audioLengthMs: number, parser: LrcParser): PublishBody {
-  const syncedLyrics = parser.serialize(doc);
+export function buildPublishBody(doc: LrcDocument, audioLengthMs: number): PublishBody {
+  const syncedLines = doc.lines
+    .filter((l) => l.timestamp !== null)
+    .map((l) => `[${msToLrc(l.timestamp!)}] ${l.text}`);
+  const syncedLyrics = syncedLines.join("\n");
   const plainLyrics = doc.lines.map((l) => l.text).join("\n");
 
   return {
@@ -29,11 +32,6 @@ export function buildPublishBody(doc: LrcDocument, audioLengthMs: number, parser
 
 export class LrclibPublisher implements LyricsPublisher {
   name = "LRCLIB";
-  private parser: LrcParser;
-
-  constructor(parser: LrcParser) {
-    this.parser = parser;
-  }
 
   async publish(doc: LrcDocument, audioLengthMs: number): Promise<PublishResult> {
     try {
@@ -52,7 +50,7 @@ export class LrclibPublisher implements LyricsPublisher {
       const token = `${prefix}:${nonce}`;
 
       // Step 3: Publish
-      const body = buildPublishBody(doc, audioLengthMs, this.parser);
+      const body = buildPublishBody(doc, audioLengthMs);
       const publishRes = await fetch(`${LRCLIB_BASE_URL}/publish`, {
         method: "POST",
         headers: {
