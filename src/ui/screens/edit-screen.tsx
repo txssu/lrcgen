@@ -35,6 +35,8 @@ type Mode =
   | "text-input-time"
   | "text-input-metadata"
   | "text-input-save"
+  | "publish-select"
+  | "publishing"
   | "lyrics-source";
 
 const STEP_OPTIONS = [10, 50, 100, 200, 500, 1000];
@@ -62,6 +64,8 @@ export function EditorScreen({
   const [paused, setPaused] = useState(false);
   const [sourceIndex, setSourceIndex] = useState(0);
   const [savePath, setSavePath] = useState("");
+  const [publishIndex, setPublishIndex] = useState(0);
+  const [publishStatus, setPublishStatus] = useState("");
 
   const step = STEP_OPTIONS[stepIndex]!;
   const currentLine = document.lines[currentIndex];
@@ -99,6 +103,7 @@ export function EditorScreen({
           { key: "y", label: "sync" },
           { key: "p", label: "play" },
           { key: "s", label: "save" },
+          { key: "u", label: "publish" },
           { key: "q", label: "quit" },
         ];
       case "sync":
@@ -128,6 +133,8 @@ export function EditorScreen({
       handlePlayInput(input, key);
     } else if (mode === "lyrics-source") {
       handleLyricsSourceInput(input, key);
+    } else if (mode === "publish-select") {
+      handlePublishSelectInput(input, key);
     }
   });
 
@@ -183,6 +190,10 @@ export function EditorScreen({
         : path.join(process.cwd(), "output.lrc");
       setSavePath(defaultPath);
       setMode("text-input-save");
+    } else if (input === "u") {
+      setPublishIndex(0);
+      setPublishStatus("");
+      setMode("publish-select");
     } else if (input === "[") {
       setStepIndex((i) => Math.max(0, i - 1));
     } else if (input === "]") {
@@ -262,6 +273,31 @@ export function EditorScreen({
           setMode("edit");
         });
       }
+    } else if (key.escape || input === "q") {
+      setMode("edit");
+    }
+  }
+
+  function handlePublishSelectInput(input: string, key: any) {
+    const publishers = registry.lyricsPublishers;
+    if (key.upArrow) {
+      setPublishIndex((i) => Math.max(0, i - 1));
+    } else if (key.downArrow) {
+      setPublishIndex((i) => Math.min(publishers.length - 1, i + 1));
+    } else if (key.return) {
+      const selected = publishers[publishIndex];
+      if (!selected) return;
+      const duration = player?.getDuration() ?? 0;
+      setPublishStatus("Solving proof-of-work...");
+      setMode("publishing");
+      selected.publish(document, duration).then((result) => {
+        if (result.success) {
+          setPublishStatus("Published!");
+        } else {
+          setPublishStatus(`Error: ${result.error}`);
+        }
+        setTimeout(() => setMode("edit"), 2000);
+      });
     } else if (key.escape || input === "q") {
       setMode("edit");
     }
@@ -388,6 +424,31 @@ export function EditorScreen({
           ))}
         </Box>
         <KeyHints hints={[{ key: "↑↓", label: "navigate" }, { key: "⏎", label: "select" }, { key: "Esc", label: "back" }]} />
+      </Box>
+    );
+  }
+
+  if (mode === "publish-select") {
+    const publishers = registry.lyricsPublishers;
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text bold>Publish to:</Text>
+        <Box flexDirection="column" marginY={1}>
+          {publishers.map((p, i) => (
+            <Text key={p.name} color={i === publishIndex ? "cyan" : undefined} bold={i === publishIndex}>
+              {i === publishIndex ? "▸ " : "  "}{p.name}
+            </Text>
+          ))}
+        </Box>
+        <KeyHints hints={[{ key: "↑↓", label: "navigate" }, { key: "⏎", label: "publish" }, { key: "Esc", label: "back" }]} />
+      </Box>
+    );
+  }
+
+  if (mode === "publishing") {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text>{publishStatus}</Text>
       </Box>
     );
   }
