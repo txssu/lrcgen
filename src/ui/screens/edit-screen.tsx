@@ -173,7 +173,8 @@ export function EditorScreen({
       player!.play(startMs);
       setMode("sync");
     } else if (input === "p" && hasPlayer) {
-      player!.play();
+      const startMs = currentLine?.timestamp ?? 0;
+      player!.play(startMs);
       setPaused(false);
       setMode("play");
     } else if (input === "s") {
