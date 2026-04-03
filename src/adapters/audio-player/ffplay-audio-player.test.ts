@@ -115,4 +115,24 @@ describe("FfplayAudioPlayer", () => {
 
     player.dispose();
   });
+
+  test("position calibrated by ffplay stderr, not ahead of real audio", async () => {
+    const player = new FfplayAudioPlayer(TEST_FILE);
+    await player.init();
+
+    player.play();
+    // Wait for ffplay to start and calibration to happen
+    await new Promise((r) => setTimeout(r, 500));
+
+    const pos = player.getCurrentPosition();
+    // Wall clock would say ~500ms. With calibration (startup delay subtracted),
+    // position should be noticeably less than 500ms.
+    // ffplay typically has 100-400ms startup delay.
+    expect(pos).toBeLessThan(450);
+
+    // Also: startupDelay should have been detected (non-zero)
+    expect((player as any)._startupDelayMs).toBeGreaterThan(0);
+
+    player.dispose();
+  });
 });
