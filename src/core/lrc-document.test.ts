@@ -1,6 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import {
   createDocument, addLines, setTimestamp, setLineText, setMetadata, linesFromText,
+  insertLine, removeLine,
 } from "./lrc-document";
 import type { LrcDocument } from "./lrc-document";
 
@@ -68,6 +69,49 @@ describe("setLineText", () => {
     const doc = addLines(createDocument(), linesFromText("Old text"));
     const updated = setLineText(doc, 0, "New text");
     expect(updated.lines[0]!.text).toBe("New text");
+  });
+});
+
+describe("insertLine", () => {
+  test("inserts empty line after given index", () => {
+    const doc = addLines(createDocument(), linesFromText("A\nB\nC"));
+    const updated = insertLine(doc, 1);
+    expect(updated.lines).toHaveLength(4);
+    expect(updated.lines[1]!.text).toBe("B");
+    expect(updated.lines[2]!.text).toBe("");
+    expect(updated.lines[2]!.timestamp).toBeNull();
+    expect(updated.lines[3]!.text).toBe("C");
+  });
+
+  test("inserts at end when index is last", () => {
+    const doc = addLines(createDocument(), linesFromText("A\nB"));
+    const updated = insertLine(doc, 1);
+    expect(updated.lines).toHaveLength(3);
+    expect(updated.lines[2]!.text).toBe("");
+  });
+
+  test("inserts at beginning when index is -1", () => {
+    const doc = addLines(createDocument(), linesFromText("A"));
+    const updated = insertLine(doc, -1);
+    expect(updated.lines).toHaveLength(2);
+    expect(updated.lines[0]!.text).toBe("");
+    expect(updated.lines[1]!.text).toBe("A");
+  });
+});
+
+describe("removeLine", () => {
+  test("removes line at given index", () => {
+    const doc = addLines(createDocument(), linesFromText("A\nB\nC"));
+    const updated = removeLine(doc, 1);
+    expect(updated.lines).toHaveLength(2);
+    expect(updated.lines[0]!.text).toBe("A");
+    expect(updated.lines[1]!.text).toBe("C");
+  });
+
+  test("does nothing for out of range index", () => {
+    const doc = addLines(createDocument(), linesFromText("A"));
+    const updated = removeLine(doc, 5);
+    expect(updated.lines).toHaveLength(1);
   });
 });
 

@@ -5,7 +5,7 @@ import type { Registry } from "../../registry";
 import type { LrcDocument } from "../../core/lrc-document";
 import type { AudioRef } from "../../ports/audio-source";
 import type { AudioPlayer } from "../../ports/audio-player";
-import { setTimestamp, setLineText, addLines, linesFromText, setMetadata } from "../../core/lrc-document";
+import { setTimestamp, setLineText, addLines, linesFromText, setMetadata, insertLine, removeLine } from "../../core/lrc-document";
 import { lrcToMs } from "../../core/time-utils";
 import { LocalAudioSource } from "../../adapters/audio-source/local-audio-source";
 import { ProgressBar } from "../components/progress-bar";
@@ -98,6 +98,8 @@ export function EditorScreen({
         return [
           { key: "←→", label: `±${step}ms` },
           { key: "⏎", label: "play line" },
+          { key: "o", label: "insert" },
+          { key: "d", label: "delete" },
           { key: "e", label: "edit" },
           { key: "t", label: "time" },
           { key: "a", label: "audio" },
@@ -164,6 +166,12 @@ export function EditorScreen({
       const nextLine = document.lines[currentIndex + 1];
       const endMs = nextLine?.timestamp ?? (currentLine.timestamp! + 5000);
       player!.playSegment(currentLine.timestamp!, endMs);
+    } else if (input === "o") {
+      onDocumentChange(insertLine(document, currentIndex));
+      setCurrentIndex(currentIndex + 1);
+    } else if (input === "d" && document.lines.length > 0) {
+      onDocumentChange(removeLine(document, currentIndex));
+      setCurrentIndex(Math.min(currentIndex, document.lines.length - 2));
     } else if (input === "e" && currentLine) {
       setInputValue(currentLine.text);
       setMode("text-input-edit");

@@ -41,6 +41,19 @@ export function setLineText(doc: LrcDocument, index: number, text: string): LrcD
   return { ...doc, lines };
 }
 
+export function insertLine(doc: LrcDocument, afterIndex: number): LrcDocument {
+  const newLine: LrcLine = { timestamp: null, text: "" };
+  const lines = [...doc.lines];
+  lines.splice(afterIndex + 1, 0, newLine);
+  return { ...doc, lines };
+}
+
+export function removeLine(doc: LrcDocument, index: number): LrcDocument {
+  if (index < 0 || index >= doc.lines.length) return doc;
+  const lines = doc.lines.filter((_, i) => i !== index);
+  return { ...doc, lines };
+}
+
 export function setMetadata(doc: LrcDocument, updates: Partial<Omit<LrcMetadata, "tool">>): LrcDocument {
   return { ...doc, metadata: { ...doc.metadata, ...updates, tool: TOOL_URL } };
 }
