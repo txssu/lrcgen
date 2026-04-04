@@ -33,6 +33,21 @@ describe("buildPublishBody", () => {
     expect(body.syncedLyrics).not.toContain("[tool:");
   });
 
+  test("trims whitespace from text in synced and plain lyrics", () => {
+    let doc = createDocument({ artist: "Test", title: "Test" });
+    // Simulate user-entered whitespace
+    doc = { ...doc, lines: [
+      { timestamp: 1000, text: "  Song text  " },
+      { timestamp: 5000, text: "  Another  " },
+    ]};
+
+    const body = buildPublishBody(doc, 60000);
+
+    expect(body.syncedLyrics).toContain("[00:01.00] Song text\n");
+    expect(body.syncedLyrics).not.toContain("  Song text");
+    expect(body.plainLyrics).toBe("Song text\nAnother");
+  });
+
   test("uses empty strings for missing metadata", () => {
     let doc = createDocument();
     doc = addLines(doc, linesFromText("Hello"));

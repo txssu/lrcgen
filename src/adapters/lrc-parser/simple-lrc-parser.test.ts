@@ -77,6 +77,14 @@ describe("SimpleLrcParser.serialize", () => {
     const output = parser.serialize(doc);
     expect(output).toContain("[tool:https://github.com/txssu/lrcgen]");
   });
+  test("trims whitespace from text on serialize", () => {
+    let doc = parser.parse("[00:01.00]Hello");
+    // Manually inject whitespace to simulate user input
+    doc = { ...doc, lines: [{ timestamp: 1000, text: "  Song text  " }] };
+    const output = parser.serialize(doc);
+    expect(output).toContain("[00:01.00] Song text");
+    expect(output).not.toContain("  Song text");
+  });
   test("round-trips correctly", () => {
     const input = "[ar:Radiohead]\n[ti:Creep]\n[00:12.30]First\n[00:15.80]Second";
     const doc = parser.parse(input);

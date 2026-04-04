@@ -59,10 +59,11 @@ export class SimpleLrcParser implements LrcParser {
     }
     parts.push(`[tool:${doc.metadata.tool}]`);
     for (const line of doc.lines) {
+      const text = line.text.trim();
       if (line.timestamp !== null) {
-        parts.push(`[${msToLrc(line.timestamp)}] ${line.text}`);
+        parts.push(`[${msToLrc(line.timestamp)}] ${text}`);
       } else {
-        parts.push(line.text);
+        parts.push(text);
       }
     }
     return parts.join("\n");

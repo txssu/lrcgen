@@ -16,9 +16,9 @@ interface PublishBody {
 export function buildPublishBody(doc: LrcDocument, audioLengthMs: number): PublishBody {
   const syncedLines = doc.lines
     .filter((l) => l.timestamp !== null)
-    .map((l) => `[${msToLrc(l.timestamp!)}] ${l.text}`);
+    .map((l) => `[${msToLrc(l.timestamp!)}] ${l.text.trim()}`);
   const syncedLyrics = syncedLines.join("\n");
-  const plainLyrics = doc.lines.map((l) => l.text).join("\n");
+  const plainLyrics = doc.lines.map((l) => l.text.trim()).join("\n");
 
   return {
     trackName: doc.metadata.title ?? "",
