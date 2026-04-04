@@ -2,7 +2,7 @@ import type { AudioSource } from "./ports/audio-source";
 import type { LyricsProvider } from "./ports/lyrics-provider";
 import type { LrcParser } from "./ports/lrc-parser";
 import type { LyricsPublisher } from "./ports/lyrics-publisher";
-import { LocalAudioSource } from "./adapters/audio-source/local-audio-source";
+import { LocalAudioSource, type PlayerBackend } from "./adapters/audio-source/local-audio-source";
 import { ClipboardLyricsProvider } from "./adapters/lyrics-provider/clipboard-lyrics-provider";
 import { LrclibLyricsProvider } from "./adapters/lyrics-provider/lrclib-lyrics-provider";
 import { SimpleLrcParser } from "./adapters/lrc-parser/simple-lrc-parser";
@@ -15,10 +15,10 @@ export interface Registry {
   lrcParser: LrcParser;
 }
 
-export function createDefaultRegistry(): Registry {
+export function createDefaultRegistry(backend: PlayerBackend = "mpv"): Registry {
   const lrcParser = new SimpleLrcParser();
   return {
-    audioSources: [new LocalAudioSource()],
+    audioSources: [new LocalAudioSource(backend)],
     lyricsProviders: [new ClipboardLyricsProvider(), new LrclibLyricsProvider()],
     lyricsPublishers: [new LrclibPublisher()],
     lrcParser,

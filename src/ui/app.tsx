@@ -7,7 +7,7 @@ import { createDocument } from "../core/lrc-document";
 import { StartScreen } from "./screens/start-screen";
 import { ImportScreen } from "./screens/import-screen";
 import { EditorScreen } from "./screens/edit-screen";
-import { FfplayAudioPlayer } from "../adapters/audio-player/ffplay-audio-player";
+import { BaseAudioPlayer } from "../adapters/audio-player/base-audio-player";
 import { detectMatchingAudio } from "../core/auto-detect-audio";
 import { LocalAudioSource } from "../adapters/audio-source/local-audio-source";
 
@@ -33,7 +33,7 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
     player?.dispose();
     const source = registry.audioSources.find((s) => s.name === ref.source) ?? registry.audioSources[0]!;
     const newPlayer = source.createPlayer(ref);
-    if (newPlayer instanceof FfplayAudioPlayer) {
+    if (newPlayer instanceof BaseAudioPlayer) {
       await newPlayer.init();
     }
     setPlayer(newPlayer);
