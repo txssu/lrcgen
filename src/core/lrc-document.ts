@@ -24,7 +24,7 @@ export function createDocument(metadata?: Partial<Omit<LrcMetadata, "tool">>): L
 
 export function linesFromText(text: string): LrcLine[] {
   if (!text) return [];
-  return text.split("\n").filter((line) => line.trim() !== "").map((line) => ({ timestamp: null, text: line }));
+  return text.split("\n").map((line) => line.trim()).filter((line) => line !== "").map((text) => ({ timestamp: null, text }));
 }
 
 export function addLines(doc: LrcDocument, lines: LrcLine[]): LrcDocument {

@@ -38,7 +38,7 @@ export class SimpleLrcParser implements LrcParser {
       const lineMatch = trimmed.match(/^\[(\d{2,}:\d{2}\.\d{2})\]\s?(.*)$/);
       if (lineMatch) {
         const timestamp = lrcToMs(lineMatch[1]!);
-        lines.push({ timestamp, text: lineMatch[2]! });
+        lines.push({ timestamp, text: lineMatch[2]!.trim() });
         continue;
       }
 

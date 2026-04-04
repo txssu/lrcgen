@@ -38,6 +38,13 @@ describe("linesFromText", () => {
   test("returns empty array for empty string", () => {
     expect(linesFromText("")).toEqual([]);
   });
+  test("trims whitespace from lines", () => {
+    const lines = linesFromText("  Song text  \n  Another line ");
+    expect(lines).toEqual([
+      { timestamp: null, text: "Song text" },
+      { timestamp: null, text: "Another line" },
+    ]);
+  });
 });
 
 describe("addLines", () => {

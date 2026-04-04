@@ -48,6 +48,12 @@ describe("SimpleLrcParser.parse", () => {
     expect(doc.metadata.artist).toBe("Muse");
     expect(doc.lines).toHaveLength(2);
   });
+  test("trims whitespace from line text", () => {
+    const input = "[00:01.00]  Song text  \n[00:05.00]   Another  ";
+    const doc = parser.parse(input);
+    expect(doc.lines[0]!.text).toBe("Song text");
+    expect(doc.lines[1]!.text).toBe("Another");
+  });
 });
 
 describe("SimpleLrcParser.serialize", () => {
