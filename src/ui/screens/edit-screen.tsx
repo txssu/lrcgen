@@ -6,7 +6,7 @@ import type { LrcDocument } from "../../core/lrc-document";
 import type { AudioRef } from "../../ports/audio-source";
 import type { AudioPlayer } from "../../ports/audio-player";
 import { setTimestamp, setLineText, addLines, linesFromText, setMetadata, insertLine, removeLine } from "../../core/lrc-document";
-import { lrcToMs } from "../../core/time-utils";
+import { lrcToMs, msToLrc } from "../../core/time-utils";
 import { LocalAudioSource } from "../../adapters/audio-source/local-audio-source";
 import { ProgressBar } from "../components/progress-bar";
 import { LineList } from "../components/line-list";
@@ -32,8 +32,8 @@ type Mode =
   | "play"
   | "file-picker-audio"
   | "file-picker-lyrics"
-  | "text-input-edit"
-  | "text-input-time"
+  | "inline-edit-text"
+  | "inline-edit-time"
   | "text-input-metadata"
   | "text-input-save"
   | "confirm-lrc"
@@ -69,6 +69,10 @@ export function EditorScreen({
   const [publishIndex, setPublishIndex] = useState(0);
   const [publishStatus, setPublishStatus] = useState("");
   const [foundLrcPath, setFoundLrcPath] = useState("");
+  const [timeDigits, setTimeDigits] = useState("000000");
+  const [timeCursorPos, setTimeCursorPos] = useState(0);
+  const [editText, setEditText] = useState("");
+  const [textCursorPos, setTextCursorPos] = useState(0);
 
   const step = STEP_OPTIONS[stepIndex]!;
   const currentLine = document.lines[currentIndex];
@@ -138,6 +142,10 @@ export function EditorScreen({
       handlePlayInput(input, key);
     } else if (mode === "lyrics-source") {
       handleLyricsSourceInput(input, key);
+    } else if (mode === "inline-edit-time") {
+      handleInlineTimeInput(input, key);
+    } else if (mode === "inline-edit-text") {
+      handleInlineTextInput(input, key);
     } else if (mode === "confirm-lrc") {
       if (input === "y") {
         Bun.file(foundLrcPath).text().then((text) => {
@@ -173,11 +181,15 @@ export function EditorScreen({
       onDocumentChange(removeLine(document, currentIndex));
       setCurrentIndex(Math.min(currentIndex, document.lines.length - 2));
     } else if (input === "e" && currentLine) {
-      setInputValue(currentLine.text);
-      setMode("text-input-edit");
+      setEditText(currentLine.text);
+      setTextCursorPos(currentLine.text.length);
+      setMode("inline-edit-text");
     } else if (input === "t") {
-      setInputValue("");
-      setMode("text-input-time");
+      const ts = currentLine?.timestamp ?? 0;
+      const lrc = msToLrc(ts);
+      setTimeDigits(lrc.replace(/[:\.]/g, ""));
+      setTimeCursorPos(0);
+      setMode("inline-edit-time");
     } else if (input === "a") {
       setMode("file-picker-audio");
     } else if (input === "l") {
@@ -305,6 +317,50 @@ export function EditorScreen({
     }
   }
 
+  function handleInlineTimeInput(input: string, key: any) {
+    if (key.return) {
+      // Apply: parse "012986" → "01:29.86" → ms
+      const formatted = `${timeDigits[0]}${timeDigits[1]}:${timeDigits[2]}${timeDigits[3]}.${timeDigits[4]}${timeDigits[5]}`;
+      const ms = lrcToMs(formatted);
+      if (ms !== null) {
+        onDocumentChange(setTimestamp(document, currentIndex, ms));
+      }
+      setMode("edit");
+    } else if (key.escape) {
+      setMode("edit");
+    } else if (key.leftArrow) {
+      setTimeCursorPos((p) => Math.max(0, p - 1));
+    } else if (key.rightArrow) {
+      setTimeCursorPos((p) => Math.min(5, p + 1));
+    } else if (input >= "0" && input <= "9") {
+      const digits = timeDigits.split("");
+      digits[timeCursorPos] = input;
+      setTimeDigits(digits.join(""));
+      setTimeCursorPos((p) => Math.min(5, p + 1));
+    }
+  }
+
+  function handleInlineTextInput(input: string, key: any) {
+    if (key.return) {
+      onDocumentChange(setLineText(document, currentIndex, editText));
+      setMode("edit");
+    } else if (key.escape) {
+      setMode("edit");
+    } else if (key.leftArrow) {
+      setTextCursorPos((p) => Math.max(0, p - 1));
+    } else if (key.rightArrow) {
+      setTextCursorPos((p) => Math.min(editText.length, p + 1));
+    } else if (key.backspace || key.delete) {
+      if (textCursorPos > 0) {
+        setEditText(editText.slice(0, textCursorPos - 1) + editText.slice(textCursorPos));
+        setTextCursorPos((p) => p - 1);
+      }
+    } else if (input && !key.ctrl && !key.meta) {
+      setEditText(editText.slice(0, textCursorPos) + input + editText.slice(textCursorPos));
+      setTextCursorPos((p) => p + input.length);
+    }
+  }
+
   function handlePublishSelectInput(input: string, key: any) {
     const publishers = registry.lyricsPublishers;
     if (key.upArrow) {
@@ -400,32 +456,7 @@ export function EditorScreen({
     );
   }
 
-  if (mode === "text-input-edit") {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Edit text:</Text>
-        <TextInput value={inputValue} onChange={setInputValue} onSubmit={(value) => {
-          onDocumentChange(setLineText(document, currentIndex, value));
-          setMode("edit");
-        }} />
-      </Box>
-    );
-  }
-
-  if (mode === "text-input-time") {
-    return (
-      <Box flexDirection="column" padding={1}>
-        <Text>Enter time (mm:ss.xx):</Text>
-        <TextInput value={inputValue} onChange={setInputValue} onSubmit={(value) => {
-          const ms = lrcToMs(value);
-          if (ms !== null) {
-            onDocumentChange(setTimestamp(document, currentIndex, ms));
-          }
-          setMode("edit");
-        }} />
-      </Box>
-    );
-  }
+  // text-input-edit and text-input-time are now inline modes (handled in main layout)
 
   if (mode === "text-input-metadata") {
     const fields: Array<"artist" | "title" | "album"> = ["artist", "title", "album"];
@@ -502,7 +533,48 @@ export function EditorScreen({
   }
 
   // --- Main layout ---
-  const modeLabel = mode === "edit" ? "[edit]" : mode === "sync" ? "[sync]" : mode === "play" ? "[play]" : "[edit]";
+  const modeLabel = mode === "edit" ? "[edit]"
+    : mode === "sync" ? "[sync]"
+    : mode === "play" ? "[play]"
+    : mode === "inline-edit-time" ? "[time]"
+    : mode === "inline-edit-text" ? "[text]"
+    : "[edit]";
+
+  // Build inline edit overlay for current line
+  let currentLineOverride: React.ReactNode | undefined;
+
+  if (mode === "inline-edit-time") {
+    // Render timestamp with cursor: [01:29.86] where cursor digit is inverted
+    const d = timeDigits;
+    const formatted = [d[0], d[1], ":", d[2], d[3], ".", d[4], d[5]];
+    const cursorCharIndex = timeCursorPos < 2 ? timeCursorPos : timeCursorPos < 4 ? timeCursorPos + 1 : timeCursorPos + 2;
+    const lineText = currentLine?.text ?? "";
+    currentLineOverride = (
+      <Text bold color="cyan">
+        [
+        {formatted.map((ch, i) => (
+          i === cursorCharIndex
+            ? <Text key={i} backgroundColor="white" color="black">{ch}</Text>
+            : <Text key={i}>{ch}</Text>
+        ))}
+        ] {lineText}
+      </Text>
+    );
+  }
+
+  if (mode === "inline-edit-text") {
+    const timeStr = currentLine?.timestamp != null ? `[${msToLrc(currentLine.timestamp)}]` : "[  ?.??  ]";
+    const before = editText.slice(0, textCursorPos);
+    const cursorChar = editText[textCursorPos] ?? " ";
+    const after = editText.slice(textCursorPos + 1);
+    currentLineOverride = (
+      <Text bold color="cyan">
+        {timeStr} {before}
+        <Text backgroundColor="white" color="black">{cursorChar}</Text>
+        {after}
+      </Text>
+    );
+  }
 
   return (
     <Box flexDirection="column" height={rows}>
@@ -519,7 +591,7 @@ export function EditorScreen({
       )}
 
       <Box flexGrow={1} marginY={1}>
-        <LineList lines={document.lines} currentIndex={currentIndex} visibleCount={lineListHeight} />
+        <LineList lines={document.lines} currentIndex={currentIndex} visibleCount={lineListHeight} currentLineOverride={currentLineOverride} />
       </Box>
 
       <Box justifyContent="space-between">
