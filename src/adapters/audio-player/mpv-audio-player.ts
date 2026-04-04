@@ -1,56 +1,212 @@
+import type { AudioPlayer } from "../../ports/audio-player";
 import type { Subprocess } from "bun";
-import { BaseAudioPlayer } from "./base-audio-player";
+import { unlinkSync } from "node:fs";
 
-export class MpvAudioPlayer extends BaseAudioPlayer {
+export class MpvAudioPlayer implements AudioPlayer {
+  private process: Subprocess | null = null;
+  private filePath: string;
+  private socketPath: string;
+  private _duration: number = 0;
+  private _position: number = 0;
+  private _playing: boolean = false;
+  private positionCallbacks: Set<(ms: number) => void> = new Set();
+  private ticker: ReturnType<typeof setInterval> | null = null;
+  private _segmentEndMs: number | null = null;
+  private segmentTimer: ReturnType<typeof setTimeout> | null = null;
+  private socket: Awaited<ReturnType<typeof Bun.connect>> | null = null;
+  private pendingRequests: Map<number, (value: unknown) => void> = new Map();
+  private nextReqId: number = 1;
+
+  constructor(filePath: string) {
+    this.filePath = filePath;
+    this.socketPath = `/tmp/lrcgen-mpv-${process.pid}-${Date.now()}.sock`;
+  }
+
   async init(): Promise<void> {
-    // Use mpv to get duration: play 0 frames, print duration
-    const proc = Bun.spawn([
-      "mpv", "--no-video", "--no-audio", "--frames=0",
-      `--term-status-msg=DURATION:\${=duration}`,
+    this.process = Bun.spawn([
+      "mpv",
+      "--no-video",
+      "--pause",
+      "--idle=once",
+      "--input-terminal=no",
+      "--really-quiet",
+      `--input-ipc-server=${this.socketPath}`,
       this.filePath,
-    ], { stdout: "pipe", stderr: "ignore" });
-    const output = await new Response(proc.stdout).text();
-    await proc.exited;
-    const match = output.match(/DURATION:(\d+\.?\d*)/);
-    if (match) {
-      this._duration = Math.round(parseFloat(match[1]!) * 1000);
+    ], { stdout: "ignore", stderr: "ignore" });
+
+    await this.waitForSocket();
+    await this.connectSocket();
+
+    const duration = await this.getProperty("duration");
+    if (typeof duration === "number") {
+      this._duration = Math.round(duration * 1000);
     }
   }
 
-  protected spawnPlay(fromMs: number): Subprocess {
-    const args = ["--no-video", "--input-terminal=no", "--msg-level=all=error,statusline=status"];
-    if (fromMs > 0) {
-      args.push(`--start=${fromMs / 1000}`);
-    }
-    args.push(this.filePath);
-    return Bun.spawn(["mpv", ...args], { stdout: "ignore", stderr: "pipe" });
+  play(fromMs?: number): void {
+    this.clearSegmentTimer();
+    this._segmentEndMs = null;
+    this.sendCommand("seek", (fromMs ?? 0) / 1000, "absolute");
+    this.sendCommand("set_property", "pause", false);
+    this._playing = true;
+    this.startTicker();
   }
 
-  protected spawnPlaySegment(fromMs: number, durationSec: number): Subprocess {
-    const args = ["--no-video", "--input-terminal=no", "--msg-level=all=error,statusline=status"];
-    if (fromMs > 0) {
-      args.push(`--start=${fromMs / 1000}`);
-    }
-    args.push(`--length=${durationSec}`);
-    args.push(this.filePath);
-    return Bun.spawn(["mpv", ...args], { stdout: "ignore", stderr: "pipe" });
+  playSegment(fromMs: number, toMs: number): void {
+    this.clearSegmentTimer();
+    this._segmentEndMs = toMs;
+    this.sendCommand("seek", fromMs / 1000, "absolute");
+    this.sendCommand("set_property", "pause", false);
+    this._playing = true;
+    this.startTicker();
+
+    this.segmentTimer = setTimeout(() => {
+      this.sendCommand("set_property", "pause", true);
+      this._position = toMs;
+      this._playing = false;
+      this.stopTicker();
+      this.notifyPosition();
+    }, toMs - fromMs);
   }
 
-  protected parsePositionFromOutput(text: string): number | null {
-    // mpv status line: "AV: 00:01:23 / 00:04:12 (29%)" or "(+) Audio --audio --   0:01:23 / 0:04:12 (29%)"
-    // Also matches: "A: 00:00:01 / 00:00:30 (5%)"
-    const match = text.match(/[AV]+:\s*(\d+):(\d{2}):(\d{2})/);
-    if (!match) {
-      // Also try shorter format: "A:  0:01 / 0:30"
-      const shortMatch = text.match(/[AV]+:\s*(\d+):(\d{2})/);
-      if (!shortMatch) return null;
-      const min = parseInt(shortMatch[1]!, 10);
-      const sec = parseInt(shortMatch[2]!, 10);
-      return (min * 60 + sec) * 1000;
+  pause(): void {
+    if (!this._playing) return;
+    this.clearSegmentTimer();
+    this.sendCommand("set_property", "pause", true);
+    this._playing = false;
+    this.stopTicker();
+    this.fetchPosition();
+  }
+
+  resume(): void {
+    if (this._playing) return;
+    this.sendCommand("set_property", "pause", false);
+    this._playing = true;
+    this.startTicker();
+  }
+
+  seek(ms: number): void {
+    this.play(ms);
+  }
+
+  getCurrentPosition(): number {
+    if (this._segmentEndMs !== null) {
+      return Math.min(this._position, this._segmentEndMs);
     }
-    const hours = parseInt(match[1]!, 10);
-    const min = parseInt(match[2]!, 10);
-    const sec = parseInt(match[3]!, 10);
-    return (hours * 3600 + min * 60 + sec) * 1000;
+    return this._position;
+  }
+
+  getDuration(): number {
+    return this._duration;
+  }
+
+  onPosition(callback: (ms: number) => void): () => void {
+    this.positionCallbacks.add(callback);
+    return () => { this.positionCallbacks.delete(callback); };
+  }
+
+  dispose(): void {
+    this.stopTicker();
+    this.clearSegmentTimer();
+    this._playing = false;
+    this.sendCommand("quit");
+    setTimeout(() => {
+      if (this.process) { this.process.kill(); this.process = null; }
+      try { unlinkSync(this.socketPath); } catch {}
+    }, 200);
+  }
+
+  // --- IPC via Unix socket ---
+
+  private async waitForSocket(): Promise<void> {
+    for (let i = 0; i < 100; i++) {
+      if (await Bun.file(this.socketPath).exists()) return;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  }
+
+  private async connectSocket(): Promise<void> {
+    const self = this;
+    let buffer = "";
+
+    this.socket = await Bun.connect({
+      unix: this.socketPath,
+      socket: {
+        data(_socket, data) {
+          buffer += new TextDecoder().decode(data);
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              // Route responses to pending requests
+              if (msg.request_id !== undefined && self.pendingRequests.has(msg.request_id)) {
+                const resolve = self.pendingRequests.get(msg.request_id)!;
+                self.pendingRequests.delete(msg.request_id);
+                resolve(msg.data);
+              }
+              // Handle end-of-file event
+              if (msg.event === "end-file") {
+                self._playing = false;
+                self.stopTicker();
+              }
+            } catch {}
+          }
+        },
+        open() {},
+        close() { self.socket = null; },
+        error() {},
+      },
+    });
+  }
+
+  private sendCommand(...args: unknown[]): void {
+    if (!this.socket) return;
+    this.socket.write(JSON.stringify({ command: args }) + "\n");
+  }
+
+  private async getProperty(name: string): Promise<unknown> {
+    if (!this.socket) return null;
+    const id = this.nextReqId++;
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        resolve(null);
+      }, 2000);
+      this.pendingRequests.set(id, (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      });
+      this.socket!.write(JSON.stringify({ command: ["get_property", name], request_id: id }) + "\n");
+    });
+  }
+
+  private async fetchPosition(): Promise<void> {
+    const pos = await this.getProperty("time-pos");
+    if (typeof pos === "number") {
+      this._position = Math.round(pos * 1000);
+    }
+  }
+
+  private startTicker(): void {
+    this.stopTicker();
+    this.ticker = setInterval(() => {
+      if (!this._playing) return;
+      this.fetchPosition().then(() => this.notifyPosition());
+    }, 50);
+  }
+
+  private notifyPosition(): void {
+    const pos = this.getCurrentPosition();
+    for (const cb of this.positionCallbacks) { cb(pos); }
+  }
+
+  private stopTicker(): void {
+    if (this.ticker) { clearInterval(this.ticker); this.ticker = null; }
+  }
+
+  private clearSegmentTimer(): void {
+    if (this.segmentTimer) { clearTimeout(this.segmentTimer); this.segmentTimer = null; }
   }
 }

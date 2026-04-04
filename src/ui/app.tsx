@@ -8,6 +8,7 @@ import { StartScreen } from "./screens/start-screen";
 import { ImportScreen } from "./screens/import-screen";
 import { EditorScreen } from "./screens/edit-screen";
 import { BaseAudioPlayer } from "../adapters/audio-player/base-audio-player";
+import { MpvAudioPlayer } from "../adapters/audio-player/mpv-audio-player";
 import { detectMatchingAudio } from "../core/auto-detect-audio";
 import { LocalAudioSource } from "../adapters/audio-source/local-audio-source";
 
@@ -33,7 +34,7 @@ export function App({ registry, initialDocument, initialScreen }: AppProps) {
     player?.dispose();
     const source = registry.audioSources.find((s) => s.name === ref.source) ?? registry.audioSources[0]!;
     const newPlayer = source.createPlayer(ref);
-    if (newPlayer instanceof BaseAudioPlayer) {
+    if (newPlayer instanceof BaseAudioPlayer || newPlayer instanceof MpvAudioPlayer) {
       await newPlayer.init();
     }
     setPlayer(newPlayer);
